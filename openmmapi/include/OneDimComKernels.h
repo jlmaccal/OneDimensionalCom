@@ -1,5 +1,5 @@
-#ifndef OPENMM_CUDAEXAMPLEKERNELSOURCES_H_
-#define OPENMM_CUDAEXAMPLEKERNELSOURCES_H_
+#ifndef EXAMPLE_KERNELS_H_
+#define EXAMPLE_KERNELS_H_
 
 /* -------------------------------------------------------------------------- *
  *                                   OpenMM                                   *
@@ -32,21 +32,49 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
+#include "OneDimComForce.h"
+#include "openmm/KernelImpl.h"
+#include "openmm/Platform.h"
+#include "openmm/System.h"
 #include <string>
 
-namespace ExamplePlugin {
+namespace OneDimComPlugin {
 
 /**
- * This class is a central holding place for the source code of CUDA kernels.
- * The CMake build script inserts declarations into it based on the .cu files in the
- * kernels subfolder.
+ * This kernel is invoked by OneDimComForce to calculate the forces acting on the system and the energy of the system.
  */
-
-class CudaExampleKernelSources {
+class CalcOneDimComForceKernel : public OpenMM::KernelImpl {
 public:
-@CUDA_FILE_DECLARATIONS@
+    static std::string Name() {
+        return "CalcOneDimComForce";
+    }
+    CalcOneDimComForceKernel(std::string name, const OpenMM::Platform& platform) : OpenMM::KernelImpl(name, platform) {
+    }
+    /**
+     * Initialize the kernel.
+     * 
+     * @param system     the System this kernel will be applied to
+     * @param force      the OneDimComForce this kernel will be used for
+     */
+    virtual void initialize(const OpenMM::System& system, const OneDimComForce& force) = 0;
+    /**
+     * Execute the kernel to calculate the forces and/or energy.
+     *
+     * @param context        the context in which to execute this kernel
+     * @param includeForces  true if forces should be calculated
+     * @param includeEnergy  true if the energy should be calculated
+     * @return the potential energy due to the force
+     */
+    virtual double execute(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy) = 0;
+    /**
+     * Copy changed parameters over to a context.
+     *
+     * @param context    the context to copy parameters to
+     * @param force      the OneDimComForce to copy the parameters from
+     */
+    virtual void copyParametersToContext(OpenMM::ContextImpl& context, const OneDimComForce& force) = 0;
 };
 
-} // namespace ExamplePlugin
+}
 
-#endif /*OPENMM_CUDAEXAMPLEKERNELSOURCES_H_*/
+#endif /*EXAMPLE_KERNELS_H_*/

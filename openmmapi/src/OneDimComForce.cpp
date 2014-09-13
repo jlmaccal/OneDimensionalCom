@@ -29,24 +29,24 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "ExampleForce.h"
-#include "internal/ExampleForceImpl.h"
+#include "OneDimComForce.h"
+#include "internal/OneDimComForceImpl.h"
 #include "openmm/OpenMMException.h"
 #include "openmm/internal/AssertionUtilities.h"
 
-using namespace ExamplePlugin;
+using namespace OneDimComPlugin;
 using namespace OpenMM;
 using namespace std;
 
-ExampleForce::ExampleForce() {
+OneDimComForce::OneDimComForce() {
 }
 
-int ExampleForce::addBond(int particle1, int particle2, double length, double k) {
+int OneDimComForce::addBond(int particle1, int particle2, double length, double k) {
     bonds.push_back(BondInfo(particle1, particle2, length, k));
     return bonds.size()-1;
 }
 
-void ExampleForce::getBondParameters(int index, int& particle1, int& particle2, double& length, double& k) const {
+void OneDimComForce::getBondParameters(int index, int& particle1, int& particle2, double& length, double& k) const {
     ASSERT_VALID_INDEX(index, bonds);
     particle1 = bonds[index].particle1;
     particle2 = bonds[index].particle2;
@@ -54,7 +54,7 @@ void ExampleForce::getBondParameters(int index, int& particle1, int& particle2, 
     k = bonds[index].k;
 }
 
-void ExampleForce::setBondParameters(int index, int particle1, int particle2, double length, double k) {
+void OneDimComForce::setBondParameters(int index, int particle1, int particle2, double length, double k) {
     ASSERT_VALID_INDEX(index, bonds);
     bonds[index].particle1 = particle1;
     bonds[index].particle2 = particle2;
@@ -62,10 +62,10 @@ void ExampleForce::setBondParameters(int index, int particle1, int particle2, do
     bonds[index].k = k;
 }
 
-ForceImpl* ExampleForce::createImpl() const {
-    return new ExampleForceImpl(*this);
+ForceImpl* OneDimComForce::createImpl() const {
+    return new OneDimComForceImpl(*this);
 }
 
-void ExampleForce::updateParametersInContext(Context& context) {
-    dynamic_cast<ExampleForceImpl&>(getImplInContext(context)).updateParametersInContext(getContextImpl(context));
+void OneDimComForce::updateParametersInContext(Context& context) {
+    dynamic_cast<OneDimComForceImpl&>(getImplInContext(context)).updateParametersInContext(getContextImpl(context));
 }

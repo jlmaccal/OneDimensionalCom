@@ -1,4 +1,4 @@
-%module exampleplugin
+%module onedimcomplugin
 
 %import(module="simtk.openmm") "OpenMMSwigHeaders.i"
 
@@ -16,7 +16,7 @@ namespace std {
 };
 
 %{
-#include "ExampleForce.h"
+#include "OneDimComForce.h"
 #include "OpenMM.h"
 #include "OpenMMAmoeba.h"
 #include "OpenMMDrude.h"
@@ -47,18 +47,18 @@ except UnboundLocalError:
 /*
  * Add units to function outputs.
 */
-%pythonappend ExamplePlugin::ExampleForce::getBondParameters(int index, int& particle1, int& particle2,
+%pythonappend OneDimComPlugin::OneDimComForce::getBondParameters(int index, int& particle1, int& particle2,
                                                              double& length, double& k) const %{
     val[2] = unit.Quantity(val[2], unit.nanometer)
     val[3] = unit.Quantity(val[3], unit.kilojoule_per_mole / (unit.nanometer * unit.nanometer))
 %}
 
 
-namespace ExamplePlugin {
+namespace OneDimComPlugin {
 
-class ExampleForce : public OpenMM::Force {
+class OneDimComForce : public OpenMM::Force {
 public:
-    ExampleForce();
+    OneDimComForce();
 
     int getNumBonds() const;
 

@@ -29,19 +29,19 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "CudaExampleKernels.h"
-#include "CudaExampleKernelSources.h"
+#include "CudaOneDimComKernels.h"
+#include "CudaOneDimComKernelSources.h"
 #include "openmm/internal/ContextImpl.h"
 #include "openmm/cuda/CudaBondedUtilities.h"
 #include "openmm/cuda/CudaForceInfo.h"
 
-using namespace ExamplePlugin;
+using namespace OneDimComPlugin;
 using namespace OpenMM;
 using namespace std;
 
-class CudaExampleForceInfo : public CudaForceInfo {
+class CudaOneDimComForceInfo : public CudaForceInfo {
 public:
-    CudaExampleForceInfo(const ExampleForce& force) : force(force) {
+    CudaOneDimComForceInfo(const OneDimComForce& force) : force(force) {
     }
     int getNumParticleGroups() {
         return force.getNumBonds();
@@ -62,16 +62,16 @@ public:
         return (length1 == length2 && k1 == k2);
     }
 private:
-    const ExampleForce& force;
+    const OneDimComForce& force;
 };
 
-CudaCalcExampleForceKernel::~CudaCalcExampleForceKernel() {
+CudaCalcOneDimComForceKernel::~CudaCalcOneDimComForceKernel() {
     cu.setAsCurrent();
     if (params != NULL)
         delete params;
 }
 
-void CudaCalcExampleForceKernel::initialize(const System& system, const ExampleForce& force) {
+void CudaCalcOneDimComForceKernel::initialize(const System& system, const OneDimComForce& force) {
     cu.setAsCurrent();
     int numContexts = cu.getPlatformData().contexts.size();
     int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;
@@ -90,15 +90,15 @@ void CudaCalcExampleForceKernel::initialize(const System& system, const ExampleF
     params->upload(paramVector);
     map<string, string> replacements;
     replacements["PARAMS"] = cu.getBondedUtilities().addArgument(params->getDevicePointer(), "float2");
-    cu.getBondedUtilities().addInteraction(atoms, cu.replaceStrings(CudaExampleKernelSources::exampleForce, replacements), force.getForceGroup());
-    cu.addForce(new CudaExampleForceInfo(force));
+    cu.getBondedUtilities().addInteraction(atoms, cu.replaceStrings(CudaOneDimComKernelSources::oneDimComForce, replacements), force.getForceGroup());
+    cu.addForce(new CudaOneDimComForceInfo(force));
 }
 
-double CudaCalcExampleForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
+double CudaCalcOneDimComForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
     return 0.0;
 }
 
-void CudaCalcExampleForceKernel::copyParametersToContext(ContextImpl& context, const ExampleForce& force) {
+void CudaCalcOneDimComForceKernel::copyParametersToContext(ContextImpl& context, const OneDimComForce& force) {
     cu.setAsCurrent();
     int numContexts = cu.getPlatformData().contexts.size();
     int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;

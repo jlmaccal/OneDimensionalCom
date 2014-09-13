@@ -1,8 +1,5 @@
-#ifndef OPENMM_CUDAEXAMPLEKERNELFACTORY_H_
-#define OPENMM_CUDAEXAMPLEKERNELFACTORY_H_
-
 /* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
+ *                                OpenMMExample                                 *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -32,19 +29,59 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "openmm/KernelFactory.h"
+#include "OneDimComForce.h"
+#include "openmm/Platform.h"
+#include "openmm/internal/AssertionUtilities.h"
+#include "openmm/serialization/XmlSerializer.h"
+#include <iostream>
+#include <sstream>
 
-namespace OpenMM {
+using namespace OneDimComPlugin;
+using namespace OpenMM;
+using namespace std;
 
-/**
- * This KernelFactory creates kernels for the CUDA implementation of the Example plugin.
- */
+extern "C" void registerOneDimComSerializationProxies();
 
-class CudaExampleKernelFactory : public KernelFactory {
-public:
-    KernelImpl* createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const;
-};
+void testSerialization() {
+    // Create a Force.
 
-} // namespace OpenMM
+    OneDimComForce force;
+    force.addBond(0, 1, 1.0, 2.0);
+    force.addBond(0, 2, 2.0, 2.1);
+    force.addBond(2, 3, 3.0, 2.2);
+    force.addBond(5, 1, 4.0, 2.3);
 
-#endif /*OPENMM_CUDAEXAMPLEKERNELFACTORY_H_*/
+    // Serialize and then deserialize it.
+
+    stringstream buffer;
+    XmlSerializer::serialize<OneDimComForce>(&force, "Force", buffer);
+    OneDimComForce* copy = XmlSerializer::deserialize<OneDimComForce>(buffer);
+
+    // Compare the two forces to see if they are identical.
+
+    OneDimComForce& force2 = *copy;
+    ASSERT_EQUAL(force.getNumBonds(), force2.getNumBonds());
+    for (int i = 0; i < force.getNumBonds(); i++) {
+        int a1, a2, b1, b2;
+        double da, db, ka, kb;
+        force.getBondParameters(i, a1, a2, da, ka);
+        force2.getBondParameters(i, b1, b2, db, kb);
+        ASSERT_EQUAL(a1, b1);
+        ASSERT_EQUAL(a2, b2);
+        ASSERT_EQUAL(da, db);
+        ASSERT_EQUAL(ka, kb);
+    }
+}
+
+int main() {
+    try {
+        registerOneDimComSerializationProxies();
+        testSerialization();
+    }
+    catch(const exception& e) {
+        cout << "exception: " << e.what() << endl;
+        return 1;
+    }
+    cout << "Done" << endl;
+    return 0;
+}

@@ -1,8 +1,5 @@
-#ifndef OPENMM_EXAMPLEFORCEIMPL_H_
-#define OPENMM_EXAMPLEFORCEIMPL_H_
-
 /* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
+ *                              OpenMMExample                                   *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -32,44 +29,44 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "ExampleForce.h"
-#include "openmm/internal/ForceImpl.h"
-#include "openmm/Kernel.h"
-#include <utility>
-#include <set>
-#include <string>
+#include <exception>
 
-namespace ExamplePlugin {
+#include "CudaOneDimComKernelFactory.h"
+#include "CudaOneDimComKernels.h"
+#include "openmm/internal/windowsExport.h"
+#include "openmm/internal/ContextImpl.h"
+#include "openmm/OpenMMException.h"
 
-class System;
+using namespace OneDimComPlugin;
+using namespace OpenMM;
 
-/**
- * This is the internal implementation of ExampleForce.
- */
+extern "C" OPENMM_EXPORT void registerPlatforms() {
+}
 
-class OPENMM_EXPORT_EXAMPLE ExampleForceImpl : public OpenMM::ForceImpl {
-public:
-    ExampleForceImpl(const ExampleForce& owner);
-    ~ExampleForceImpl();
-    void initialize(OpenMM::ContextImpl& context);
-    const ExampleForce& getOwner() const {
-        return owner;
+extern "C" OPENMM_EXPORT void registerKernelFactories() {
+    try {
+        Platform& platform = Platform::getPlatformByName("CUDA");
+        CudaOneDimComKernelFactory* factory = new CudaOneDimComKernelFactory();
+        platform.registerKernelFactory(CalcOneDimComForceKernel::Name(), factory);
     }
-    void updateContextState(OpenMM::ContextImpl& context) {
-        // This force field doesn't update the state directly.
+    catch (std::exception ex) {
+        // Ignore
     }
-    double calcForcesAndEnergy(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy, int groups);
-    std::map<std::string, double> getDefaultParameters() {
-        return std::map<std::string, double>(); // This force field doesn't define any parameters.
+}
+
+extern "C" OPENMM_EXPORT void registerOneDimComCudaKernelFactories() {
+    try {
+        Platform::getPlatformByName("CUDA");
     }
-    std::vector<std::string> getKernelNames();
-    std::vector<std::pair<int, int> > getBondedParticles() const;
-    void updateParametersInContext(OpenMM::ContextImpl& context);
-private:
-    const ExampleForce& owner;
-    OpenMM::Kernel kernel;
-};
+    catch (...) {
+        Platform::registerPlatform(new CudaPlatform());
+    }
+    registerKernelFactories();
+}
 
-} // namespace ExamplePlugin
-
-#endif /*OPENMM_EXAMPLEFORCEIMPL_H_*/
+KernelImpl* CudaOneDimComKernelFactory::createKernelImpl(std::string name, const Platform& platform, ContextImpl& context) const {
+    CudaContext& cu = *static_cast<CudaPlatform::PlatformData*>(context.getPlatformData())->contexts[0];
+    if (name == CalcOneDimComForceKernel::Name())
+        return new CudaCalcOneDimComForceKernel(name, platform, cu, context.getSystem());
+    throw OpenMMException((std::string("Tried to create kernel with illegal kernel name '")+name+"'").c_str());
+}

@@ -1,5 +1,8 @@
+#ifndef OPENMM_EXAMPLE_FORCE_PROXY_H_
+#define OPENMM_EXAMPLE_FORCE_PROXY_H_
+
 /* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
+ *                                OpenMMExample                                 *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -29,8 +32,22 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "CudaExampleKernelSources.h"
+#include "internal/windowsExportExample.h"
+#include "openmm/serialization/SerializationProxy.h"
 
-using namespace ExamplePlugin;
-using namespace std;
+namespace OpenMM {
 
+/**
+ * This is a proxy for serializing OneDimComForce objects.
+ */
+
+class OPENMM_EXPORT_EXAMPLE OneDimComForceProxy : public SerializationProxy {
+public:
+    OneDimComForceProxy();
+    void serialize(const void* object, SerializationNode& node) const;
+    void* deserialize(const SerializationNode& node) const;
+};
+
+} // namespace OpenMM
+
+#endif /*OPENMM_EXAMPLE_FORCE_PROXY_H_*/

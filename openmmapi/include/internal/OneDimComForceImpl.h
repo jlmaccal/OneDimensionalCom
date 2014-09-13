@@ -1,8 +1,8 @@
-#ifndef OPENMM_EXAMPLE_FORCE_PROXY_H_
-#define OPENMM_EXAMPLE_FORCE_PROXY_H_
+#ifndef OPENMM_EXAMPLEFORCEIMPL_H_
+#define OPENMM_EXAMPLEFORCEIMPL_H_
 
 /* -------------------------------------------------------------------------- *
- *                                OpenMMExample                                 *
+ *                                   OpenMM                                   *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -32,22 +32,44 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "internal/windowsExportExample.h"
-#include "openmm/serialization/SerializationProxy.h"
+#include "OneDimComForce.h"
+#include "openmm/internal/ForceImpl.h"
+#include "openmm/Kernel.h"
+#include <utility>
+#include <set>
+#include <string>
 
-namespace OpenMM {
+namespace OneDimComPlugin {
+
+class System;
 
 /**
- * This is a proxy for serializing ExampleForce objects.
+ * This is the internal implementation of OneDimComForce.
  */
 
-class OPENMM_EXPORT_EXAMPLE ExampleForceProxy : public SerializationProxy {
+class OPENMM_EXPORT_EXAMPLE OneDimComForceImpl : public OpenMM::ForceImpl {
 public:
-    ExampleForceProxy();
-    void serialize(const void* object, SerializationNode& node) const;
-    void* deserialize(const SerializationNode& node) const;
+    OneDimComForceImpl(const OneDimComForce& owner);
+    ~OneDimComForceImpl();
+    void initialize(OpenMM::ContextImpl& context);
+    const OneDimComForce& getOwner() const {
+        return owner;
+    }
+    void updateContextState(OpenMM::ContextImpl& context) {
+        // This force field doesn't update the state directly.
+    }
+    double calcForcesAndEnergy(OpenMM::ContextImpl& context, bool includeForces, bool includeEnergy, int groups);
+    std::map<std::string, double> getDefaultParameters() {
+        return std::map<std::string, double>(); // This force field doesn't define any parameters.
+    }
+    std::vector<std::string> getKernelNames();
+    std::vector<std::pair<int, int> > getBondedParticles() const;
+    void updateParametersInContext(OpenMM::ContextImpl& context);
+private:
+    const OneDimComForce& owner;
+    OpenMM::Kernel kernel;
 };
 
-} // namespace OpenMM
+}
 
-#endif /*OPENMM_EXAMPLE_FORCE_PROXY_H_*/
+#endif /*OPENMM_EXAMPLEFORCEIMPL_H_*/

@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- *
- *                                OpenMMExample                                 *
+ *                                   OpenMM                                   *
  * -------------------------------------------------------------------------- *
  * This is part of the OpenMM molecular simulation toolkit originating from   *
  * Simbios, the NIH National Center for Physics-Based Simulation of           *
@@ -29,59 +29,55 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "ExampleForce.h"
-#include "openmm/Platform.h"
-#include "openmm/internal/AssertionUtilities.h"
-#include "openmm/serialization/XmlSerializer.h"
-#include <iostream>
+#ifdef WIN32
+  #define _USE_MATH_DEFINES // Needed to get M_PI
+#endif
+#include "internal/OneDimComForceImpl.h"
+#include "OneDimComKernels.h"
+#include "openmm/OpenMMException.h"
+#include "openmm/internal/ContextImpl.h"
+#include <cmath>
+#include <map>
+#include <set>
 #include <sstream>
 
-using namespace ExamplePlugin;
+using namespace OneDimComPlugin;
 using namespace OpenMM;
 using namespace std;
 
-extern "C" void registerExampleSerializationProxies();
-
-void testSerialization() {
-    // Create a Force.
-
-    ExampleForce force;
-    force.addBond(0, 1, 1.0, 2.0);
-    force.addBond(0, 2, 2.0, 2.1);
-    force.addBond(2, 3, 3.0, 2.2);
-    force.addBond(5, 1, 4.0, 2.3);
-
-    // Serialize and then deserialize it.
-
-    stringstream buffer;
-    XmlSerializer::serialize<ExampleForce>(&force, "Force", buffer);
-    ExampleForce* copy = XmlSerializer::deserialize<ExampleForce>(buffer);
-
-    // Compare the two forces to see if they are identical.
-
-    ExampleForce& force2 = *copy;
-    ASSERT_EQUAL(force.getNumBonds(), force2.getNumBonds());
-    for (int i = 0; i < force.getNumBonds(); i++) {
-        int a1, a2, b1, b2;
-        double da, db, ka, kb;
-        force.getBondParameters(i, a1, a2, da, ka);
-        force2.getBondParameters(i, b1, b2, db, kb);
-        ASSERT_EQUAL(a1, b1);
-        ASSERT_EQUAL(a2, b2);
-        ASSERT_EQUAL(da, db);
-        ASSERT_EQUAL(ka, kb);
-    }
+OneDimComForceImpl::OneDimComForceImpl(const OneDimComForce& owner) : owner(owner) {
 }
 
-int main() {
-    try {
-        registerExampleSerializationProxies();
-        testSerialization();
+OneDimComForceImpl::~OneDimComForceImpl() {
+}
+
+void OneDimComForceImpl::initialize(ContextImpl& context) {
+    kernel = context.getPlatform().createKernel(CalcOneDimComForceKernel::Name(), context);
+    kernel.getAs<CalcOneDimComForceKernel>().initialize(context.getSystem(), owner);
+}
+
+double OneDimComForceImpl::calcForcesAndEnergy(ContextImpl& context, bool includeForces, bool includeEnergy, int groups) {
+    if ((groups&(1<<owner.getForceGroup())) != 0)
+        return kernel.getAs<CalcOneDimComForceKernel>().execute(context, includeForces, includeEnergy);
+    return 0.0;
+}
+
+std::vector<std::string> OneDimComForceImpl::getKernelNames() {
+    std::vector<std::string> names;
+    names.push_back(CalcOneDimComForceKernel::Name());
+    return names;
+}
+
+vector<pair<int, int> > OneDimComForceImpl::getBondedParticles() const {
+    int numBonds = owner.getNumBonds();
+    vector<pair<int, int> > bonds(numBonds);
+    for (int i = 0; i < numBonds; i++) {
+        double length, k;
+        owner.getBondParameters(i, bonds[i].first, bonds[i].second, length, k);
     }
-    catch(const exception& e) {
-        cout << "exception: " << e.what() << endl;
-        return 1;
-    }
-    cout << "Done" << endl;
-    return 0;
+    return bonds;
+}
+
+void OneDimComForceImpl::updateParametersInContext(ContextImpl& context) {
+    kernel.getAs<CalcOneDimComForceKernel>().copyParametersToContext(context, owner);
 }

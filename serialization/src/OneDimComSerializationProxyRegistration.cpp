@@ -38,25 +38,25 @@
 #include <cstdlib>
 #endif
 
-#include "ExampleForce.h"
-#include "ExampleForceProxy.h"
+#include "OneDimComForce.h"
+#include "OneDimComForceProxy.h"
 #include "openmm/serialization/SerializationProxy.h"
 
 #if defined(WIN32)
     #include <windows.h>
-    extern "C" OPENMM_EXPORT_EXAMPLE void registerExampleSerializationProxies();
+    extern "C" OPENMM_EXPORT_EXAMPLE void registerOneDimComSerializationProxies();
     BOOL WINAPI DllMain(HANDLE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
         if (ul_reason_for_call == DLL_PROCESS_ATTACH)
-            registerExampleSerializationProxies();
+            registerOneDimComSerializationProxies();
         return TRUE;
     }
 #else
-    extern "C" void __attribute__((constructor)) registerExampleSerializationProxies();
+    extern "C" void __attribute__((constructor)) registerOneDimComSerializationProxies();
 #endif
 
-using namespace ExamplePlugin;
+using namespace OneDimComPlugin;
 using namespace OpenMM;
 
-extern "C" OPENMM_EXPORT_EXAMPLE void registerExampleSerializationProxies() {
-    SerializationProxy::registerProxy(typeid(ExampleForce), new ExampleForceProxy());
+extern "C" OPENMM_EXPORT_EXAMPLE void registerOneDimComSerializationProxies() {
+    SerializationProxy::registerProxy(typeid(OneDimComForce), new OneDimComForceProxy());
 }

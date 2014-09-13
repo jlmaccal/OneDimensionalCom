@@ -1,5 +1,5 @@
-#ifndef OPENMM_EXAMPLEFORCE_H_
-#define OPENMM_EXAMPLEFORCE_H_
+#ifndef OPENMM_ONEDIMCIMFORCE_H_
+#define OPENMM_ONEDIMCIMFORCE_H_
 
 /* -------------------------------------------------------------------------- *
  *                                   OpenMM                                   *
@@ -37,19 +37,19 @@
 #include <vector>
 #include "internal/windowsExportExample.h"
 
-namespace ExamplePlugin {
+namespace OneDimComPlugin {
 
 /**
  * This class implements an anharmonic bond force of the form E(r)=k*(r-length)^4.  It exists to
  * serve as an example of how to write plugins.
  */
 
-class OPENMM_EXPORT_EXAMPLE ExampleForce : public OpenMM::Force {
+class OPENMM_EXPORT_EXAMPLE OneDimComForce : public OpenMM::Force {
 public:
     /**
-     * Create an ExampleForce.
+     * Create an OneDimComForce.
      */
-    ExampleForce();
+    OneDimComForce();
     /**
      * Get the number of bond stretch terms in the potential function
      */
@@ -107,7 +107,7 @@ private:
  * This is an internal class used to record information about a bond.
  * @private
  */
-class ExampleForce::BondInfo {
+class OneDimComForce::BondInfo {
 public:
     int particle1, particle2;
     double length, k;
@@ -120,6 +120,6 @@ public:
     }
 };
 
-} // namespace ExamplePlugin
+} // namespace OneDimComPlugin
 
-#endif /*OPENMM_EXAMPLEFORCE_H_*/
+#endif

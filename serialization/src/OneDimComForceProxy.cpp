@@ -29,21 +29,21 @@
  * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
  * -------------------------------------------------------------------------- */
 
-#include "ExampleForceProxy.h"
-#include "ExampleForce.h"
+#include "OneDimComForceProxy.h"
+#include "OneDimComForce.h"
 #include "openmm/serialization/SerializationNode.h"
 #include <sstream>
 
-using namespace ExamplePlugin;
+using namespace OneDimComPlugin;
 using namespace OpenMM;
 using namespace std;
 
-ExampleForceProxy::ExampleForceProxy() : SerializationProxy("ExampleForce") {
+OneDimComForceProxy::OneDimComForceProxy() : SerializationProxy("OneDimComForce") {
 }
 
-void ExampleForceProxy::serialize(const void* object, SerializationNode& node) const {
+void OneDimComForceProxy::serialize(const void* object, SerializationNode& node) const {
     node.setIntProperty("version", 1);
-    const ExampleForce& force = *reinterpret_cast<const ExampleForce*>(object);
+    const OneDimComForce& force = *reinterpret_cast<const OneDimComForce*>(object);
     SerializationNode& bonds = node.createChildNode("Bonds");
     for (int i = 0; i < force.getNumBonds(); i++) {
         int particle1, particle2;
@@ -53,10 +53,10 @@ void ExampleForceProxy::serialize(const void* object, SerializationNode& node) c
     }
 }
 
-void* ExampleForceProxy::deserialize(const SerializationNode& node) const {
+void* OneDimComForceProxy::deserialize(const SerializationNode& node) const {
     if (node.getIntProperty("version") != 1)
         throw OpenMMException("Unsupported version number");
-    ExampleForce* force = new ExampleForce();
+    OneDimComForce* force = new OneDimComForce();
     try {
         const SerializationNode& bonds = node.getChildNode("Bonds");
         for (int i = 0; i < (int) bonds.getChildren().size(); i++) {
