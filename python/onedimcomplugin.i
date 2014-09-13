@@ -11,7 +11,7 @@
 
 %include "std_vector.i"
 namespace std {
-  %template(vectord) vector<double>;
+  %template(vectorf) vector<float>;
   %template(vectori) vector<int>;
 };
 
@@ -47,40 +47,39 @@ except UnboundLocalError:
 /*
  * Add units to function outputs.
 */
-%pythonappend OneDimComPlugin::OneDimComForce::getBondParameters(int index, int& particle1, int& particle2,
-                                                             double& length, double& k) const %{
-    val[2] = unit.Quantity(val[2], unit.nanometer)
-    val[3] = unit.Quantity(val[3], unit.kilojoule_per_mole / (unit.nanometer * unit.nanometer))
+%pythonappend OneDimComPlugin::OneDimComForce::getForceConst() const %{
+    val[0] = unit.Quantity(val[0], unit.kilojoule_per_mole / (unit.nanometer * unit.nanometer))
 %}
 
+%pythonappend OneDimComPlugin::OneDimComForce::getR0() const %{
+    val[0] = unit.Quantity(val[0], unit.nanometer)
+%}
 
 namespace OneDimComPlugin {
 
 class OneDimComForce : public OpenMM::Force {
 public:
-    OneDimComForce();
+    OneDimComForce(const std::vector<int>& group1,
+                   const std::vector<int>& group2,
+                   const std::vector<float>& weights1,
+                   const std::vector<float>& weights2,
+                   float k, float r0);
 
-    int getNumBonds() const;
+    const std::vector<int>& getGroup1Indices() const;
+    const std::vector<int>& getGroup2Indices() const;
+    const std::vector<float>& getGroup1Weights() const;
+    const std::vector<float>& getGroup2Weights() const;
+    float getForceConst() const;
+    float getR0() const;
 
-    int addBond(int particle1, int particle2, double length, double k);
-
-    void setBondParameters(int index, int particle1, int particle2, double length, double k);
+    void setGroup1Indices(const std::vector<int>& indices);
+    void setGroup2Indices(const std::vector<int>& indices);
+    void setGroup1Weights(const std::vector<float>& weights);
+    void setGroup2Weights(const std::vector<float>& weights);
+    void setForceConst(float k);
+    void setR0(float r0);
 
     void updateParametersInContext(OpenMM::Context& context);
-
-    /*
-     * The reference parameters to this function are output values.
-     * Marking them as such will cause swig to return a tuple.
-    */
-    %apply int& OUTPUT {int& particle1};
-    %apply int& OUTPUT {int& particle2};
-    %apply double& OUTPUT {double& length};
-    %apply double& OUTPUT {double& k};
-    void getBondParameters(int index, int& particle1, int& particle2, double& length, double& k) const;
-    %clear int& particle1;
-    %clear int& particle2;
-    %clear double& length;
-    %clear double& k;
 };
 
 }
