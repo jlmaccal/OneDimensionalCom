@@ -1,34 +1,3 @@
-/* -------------------------------------------------------------------------- *
- *                                   OpenMM                                   *
- * -------------------------------------------------------------------------- *
- * This is part of the OpenMM molecular simulation toolkit originating from   *
- * Simbios, the NIH National Center for Physics-Based Simulation of           *
- * Biological Structures at Stanford, funded under the NIH Roadmap for        *
- * Medical Research, grant U54 GM072970. See https://simtk.org.               *
- *                                                                            *
- * Portions copyright (c) 2014 Stanford University and the Authors.           *
- * Authors: Peter Eastman                                                     *
- * Contributors:                                                              *
- *                                                                            *
- * Permission is hereby granted, free of charge, to any person obtaining a    *
- * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
- * and/or sell copies of the Software, and to permit persons to whom the      *
- * Software is furnished to do so, subject to the following conditions:       *
- *                                                                            *
- * The above copyright notice and this permission notice shall be included in *
- * all copies or substantial portions of the Software.                        *
- *                                                                            *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
- * THE AUTHORS, CONTRIBUTORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,    *
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR      *
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE  *
- * USE OR OTHER DEALINGS IN THE SOFTWARE.                                     *
- * -------------------------------------------------------------------------- */
-
 #include "CudaOneDimComKernels.h"
 #include "CudaOneDimComKernelSources.h"
 #include "openmm/internal/ContextImpl.h"
@@ -39,87 +8,102 @@ using namespace OneDimComPlugin;
 using namespace OpenMM;
 using namespace std;
 
-class CudaOneDimComForceInfo : public CudaForceInfo {
-public:
-    CudaOneDimComForceInfo(const OneDimComForce& force) : force(force) {
+CudaCalcOneDimComForceKernel::CudaCalcOneDimComForceKernel(std::string name, const OpenMM::Platform& platform, OpenMM::CudaContext& cu, const OpenMM::System& system) :
+            CalcOneDimComForceKernel(name, platform), hasInitializedKernel(false), cu(cu), system(system), indices(NULL), weights(NULL), h_indices(0), h_weights(0),
+            forceConst(0.0), r0(0.0)
+{
+    if (cu.getUseDoublePrecision()) {
+        cout << "***\n";
+        cout << "*** MeldForce does not support double precision.\n";
+        cout << "***" << endl;
+        throw OpenMMException("MeldForce does not support double precision");
     }
-    int getNumParticleGroups() {
-        return force.getNumBonds();
-    }
-    void getParticlesInGroup(int index, vector<int>& particles) {
-        int particle1, particle2;
-        double length, k;
-        force.getBondParameters(index, particle1, particle2, length, k);
-        particles.resize(2);
-        particles[0] = particle1;
-        particles[1] = particle2;
-    }
-    bool areGroupsIdentical(int group1, int group2) {
-        int particle1, particle2;
-        double length1, length2, k1, k2;
-        force.getBondParameters(group1, particle1, particle2, length1, k1);
-        force.getBondParameters(group2, particle1, particle2, length2, k2);
-        return (length1 == length2 && k1 == k2);
-    }
-private:
-    const OneDimComForce& force;
-};
+}
 
 CudaCalcOneDimComForceKernel::~CudaCalcOneDimComForceKernel() {
     cu.setAsCurrent();
-    if (params != NULL)
-        delete params;
+    if (indices != NULL) {
+        delete indices;
+        indices = NULL;
+    }
+    if (weights != NULL) {
+        delete weights;
+        indices = NULL;
+    }
+}
+
+void CudaCalcOneDimComForceKernel::setupIndicesAndWeights(const OneDimComForce& force) {
+    // concatenate the indices into a single vector
+    h_indices.clear();
+    h_indices.reserve(force.getGroup1Indices().size() + force.getGroup2Indices().size());
+    h_indices.insert(h_indices.end(), force.getGroup1Indices().begin(), force.getGroup1Indices().end());
+    h_indices.insert(h_indices.end(), force.getGroup2Indices().begin(), force.getGroup2Indices().end());
+
+
+    // concatenate the weights, negating weights2
+    h_weights.clear();
+    h_weights.reserve(force.getGroup1Weights().size() + force.getGroup2Weights().size());
+    vector<float> w2_copy(force.getGroup2Weights().size());
+    copy(force.getGroup2Weights().begin(), force.getGroup2Weights().end(), w2_copy.begin());
+    for(vector<float>::iterator it=w2_copy.begin(); it!=w2_copy.end(); ++it) {
+        *it = -*it;
+    }
+    h_weights.insert(h_weights.end(), force.getGroup1Weights().begin(), force.getGroup1Weights().end());
+    h_weights.insert(h_weights.end(), w2_copy.begin(), w2_copy.end());
 }
 
 void CudaCalcOneDimComForceKernel::initialize(const System& system, const OneDimComForce& force) {
     cu.setAsCurrent();
-    int numContexts = cu.getPlatformData().contexts.size();
-    int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cu.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    numBonds = endIndex-startIndex;
-    if (numBonds == 0)
+
+    setupIndicesAndWeights(force);
+    forceConst = force.getForceConst();
+    r0 = force.getR0();
+
+    numAtoms = force.getGroup1Indices().size() + force.getGroup2Indices().size();
+    if (numAtoms == 0)
         return;
-    vector<vector<int> > atoms(numBonds, vector<int>(2));
-    params = CudaArray::create<float2>(cu, numBonds, "bondParams");
-    vector<float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        double length, k;
-        force.getBondParameters(startIndex+i, atoms[i][0], atoms[i][1], length, k);
-        paramVector[i] = make_float2((float) length, (float) k);
-    }
-    params->upload(paramVector);
+
+    indices = CudaArray::create<int>(cu, numAtoms, "indices");
+    weights = CudaArray::create<float>(cu, numAtoms, "weights");
+
+    indices->upload(h_indices);
+    weights->upload(h_weights);
+
     map<string, string> replacements;
-    replacements["PARAMS"] = cu.getBondedUtilities().addArgument(params->getDevicePointer(), "float2");
-    cu.getBondedUtilities().addInteraction(atoms, cu.replaceStrings(CudaOneDimComKernelSources::oneDimComForce, replacements), force.getForceGroup());
-    cu.addForce(new CudaOneDimComForceInfo(force));
+    map<string, string> defines;
+    defines["NUM_ATOMS"] = cu.intToString(cu.getNumAtoms());
+    defines["PADDED_NUM_ATOMS"] = cu.intToString(cu.getPaddedNumAtoms());
+    CUmodule module = cu.createModule(cu.replaceStrings(CudaOneDimComKernelSources::vectorOps + CudaOneDimComKernelSources::computeOneDimComForce, replacements), defines);
+    computeForceKernel = cu.getKernel(module, "computeOneDimComForce");
 }
 
 double CudaCalcOneDimComForceKernel::execute(ContextImpl& context, bool includeForces, bool includeEnergy) {
+    void* args[] = {
+        &cu.getPosq().getDevicePointer(),
+        &numAtoms,
+        &forceConst,
+        &r0,
+        &indices->getDevicePointer(),
+        &weights->getDevicePointer(),
+        &cu.getForce().getDevicePointer(),
+        &cu.getEnergyBuffer().getDevicePointer() };
+
+    // we run with a fixed thread count and block size to ensure
+    // that we always run this kernel as a single thread block.
+    // All devices of compute capability 2.0 or higher support
+    // 1024 threads in a single thread block
+    cu.executeKernel(computeForceKernel, args, 1024, 1024, 1024 * sizeof(float));
     return 0.0;
 }
 
 void CudaCalcOneDimComForceKernel::copyParametersToContext(ContextImpl& context, const OneDimComForce& force) {
     cu.setAsCurrent();
-    int numContexts = cu.getPlatformData().contexts.size();
-    int startIndex = cu.getContextIndex()*force.getNumBonds()/numContexts;
-    int endIndex = (cu.getContextIndex()+1)*force.getNumBonds()/numContexts;
-    if (numBonds != endIndex-startIndex)
-        throw OpenMMException("updateParametersInContext: The number of bonds has changed");
-    if (numBonds == 0)
-        return;
-    
-    // Record the per-bond parameters.
-    
-    vector<float2> paramVector(numBonds);
-    for (int i = 0; i < numBonds; i++) {
-        int atom1, atom2;
-        double length, k;
-        force.getBondParameters(startIndex+i, atom1, atom2, length, k);
-        paramVector[i] = make_float2((float) length, (float) k);
-    }
-    params->upload(paramVector);
-    
-    // Mark that the current reordering may be invalid.
-    
+    setupIndicesAndWeights(force);
+    forceConst = force.getForceConst();
+    r0 = force.getR0();
+
+    indices->upload(h_indices);
+    weights->upload(h_weights);
+
     cu.invalidateMolecules();
 }
