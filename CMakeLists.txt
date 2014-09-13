@@ -26,8 +26,7 @@ ENDIF(${CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT})
 
 # The source is organized into subdirectories, but we handle them all from
 # this CMakeLists file rather than letting CMake visit them as SUBDIRS.
-#SET(EXAMPLE_PLUGIN_SOURCE_SUBDIRS openmmapi serialization)
-SET(EXAMPLE_PLUGIN_SOURCE_SUBDIRS openmmapi)
+SET(EXAMPLE_PLUGIN_SOURCE_SUBDIRS openmmapi serialization)
 
 # Set the library name
 SET(EXAMPLE_LIBRARY_NAME OneDimComPlugin)
@@ -69,7 +68,7 @@ INSTALL_TARGETS(/lib RUNTIME_DIRECTORY /lib ${SHARED_EXAMPLE_TARGET})
 # Enable testing
 
 ENABLE_TESTING()
-#ADD_SUBDIRECTORY(serialization/tests)
+ADD_SUBDIRECTORY(serialization/tests)
 
 # Build the implementations for different platforms
 

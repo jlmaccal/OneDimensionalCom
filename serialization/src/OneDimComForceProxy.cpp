@@ -33,6 +33,8 @@
 #include "OneDimComForce.h"
 #include "openmm/serialization/SerializationNode.h"
 #include <sstream>
+#include <vector>
+#include <iostream>
 
 using namespace OneDimComPlugin;
 using namespace OpenMM;
@@ -44,29 +46,66 @@ OneDimComForceProxy::OneDimComForceProxy() : SerializationProxy("OneDimComForce"
 void OneDimComForceProxy::serialize(const void* object, SerializationNode& node) const {
     node.setIntProperty("version", 1);
     const OneDimComForce& force = *reinterpret_cast<const OneDimComForce*>(object);
-    SerializationNode& bonds = node.createChildNode("Bonds");
-    for (int i = 0; i < force.getNumBonds(); i++) {
-        int particle1, particle2;
-        double distance, k;
-        force.getBondParameters(i, particle1, particle2, distance, k);
-        bonds.createChildNode("Bond").setIntProperty("p1", particle1).setIntProperty("p2", particle2).setDoubleProperty("d", distance).setDoubleProperty("k", k);
+    node.setDoubleProperty("forceConst", force.getForceConst());
+    node.setDoubleProperty("r0", force.getR0());
+
+    SerializationNode& group1 = node.createChildNode("group1");
+    for (vector<int>::const_iterator it=force.getGroup1Indices().begin(); it!=force.getGroup1Indices().end(); ++it) {
+        group1.createChildNode("index").setIntProperty("index", *it);
+    }
+
+    SerializationNode& group2 = node.createChildNode("group2");
+    for (vector<int>::const_iterator it=force.getGroup2Indices().begin(); it!=force.getGroup2Indices().end(); ++it) {
+        group2.createChildNode("index").setIntProperty("index", *it);
+    }
+
+    SerializationNode& weights1 = node.createChildNode("weights1");
+    for (vector<float>::const_iterator it=force.getGroup1Weights().begin(); it!=force.getGroup1Weights().end(); ++it) {
+        weights1.createChildNode("weight").setDoubleProperty("weight", *it);
+    }
+
+    SerializationNode& weights2 = node.createChildNode("weights2");
+    for (vector<float>::const_iterator it=force.getGroup2Weights().begin(); it!=force.getGroup2Weights().end(); ++it) {
+        weights2.createChildNode("weight").setDoubleProperty("weight", *it);
     }
 }
 
 void* OneDimComForceProxy::deserialize(const SerializationNode& node) const {
     if (node.getIntProperty("version") != 1)
         throw OpenMMException("Unsupported version number");
-    OneDimComForce* force = new OneDimComForce();
+    float forceConst = 0.0;
+    float r0 = 0.0;
+    vector<int> group1;
+    vector<int> group2;
+    vector<float> weights1;
+    vector<float> weights2;
     try {
-        const SerializationNode& bonds = node.getChildNode("Bonds");
-        for (int i = 0; i < (int) bonds.getChildren().size(); i++) {
-            const SerializationNode& bond = bonds.getChildren()[i];
-            force->addBond(bond.getIntProperty("p1"), bond.getIntProperty("p2"), bond.getDoubleProperty("d"), bond.getDoubleProperty("k"));
+        forceConst = node.getDoubleProperty("forceConst");
+        r0 = node.getDoubleProperty("r0");
+
+        const SerializationNode& group1Node = node.getChildNode("group1");
+        for (vector<SerializationNode>::const_iterator it=group1Node.getChildren().begin(); it!=group1Node.getChildren().end(); ++it) {
+            group1.push_back(it->getIntProperty("index"));
+        }
+
+        const SerializationNode& group2Node = node.getChildNode("group2");
+        for (vector<SerializationNode>::const_iterator it=group2Node.getChildren().begin(); it!=group2Node.getChildren().end(); ++it) {
+            group2.push_back(it->getIntProperty("index"));
+        }
+
+        const SerializationNode& weights1Node = node.getChildNode("weights1");
+        for (vector<SerializationNode>::const_iterator it=weights1Node.getChildren().begin(); it!=weights1Node.getChildren().end(); ++it) {
+            weights1.push_back(it->getDoubleProperty("weight"));
+        }
+
+        const SerializationNode& weights2Node = node.getChildNode("weights2");
+        for (vector<SerializationNode>::const_iterator it=weights2Node.getChildren().begin(); it!=weights2Node.getChildren().end(); ++it) {
+            weights2.push_back(it->getDoubleProperty("weight"));
         }
     }
     catch (...) {
-        delete force;
         throw;
     }
+    OneDimComForce* force = new OneDimComForce(group1, group2, weights1, weights2, forceConst, r0);
     return force;
 }

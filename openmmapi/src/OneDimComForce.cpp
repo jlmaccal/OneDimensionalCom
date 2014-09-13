@@ -32,7 +32,7 @@ const vector<float>& OneDimComForce::getGroup1Weights() const {
 }
 
 const vector<float>& OneDimComForce::getGroup2Weights() const {
-    return weights1;
+    return weights2;
 }
 
 float OneDimComForce::getForceConst() const {

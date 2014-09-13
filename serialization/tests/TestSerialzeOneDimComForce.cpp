@@ -35,6 +35,7 @@
 #include "openmm/serialization/XmlSerializer.h"
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 using namespace OneDimComPlugin;
 using namespace OpenMM;
@@ -44,32 +45,62 @@ extern "C" void registerOneDimComSerializationProxies();
 
 void testSerialization() {
     // Create a Force.
+    vector<int> g1;
+    g1.push_back(0);
 
-    OneDimComForce force;
-    force.addBond(0, 1, 1.0, 2.0);
-    force.addBond(0, 2, 2.0, 2.1);
-    force.addBond(2, 3, 3.0, 2.2);
-    force.addBond(5, 1, 4.0, 2.3);
+    vector<int> g2;
+    g2.push_back(1);
+    g2.push_back(2);
 
-    // Serialize and then deserialize it.
+    vector<float> w1;
+    w1.push_back(1.0);
 
+    vector<float> w2;
+    w2.push_back(0.5);
+    w2.push_back(0.5);
+
+    float k = 2.0;
+    float r0 = 1.0;
+
+    // create the force
+    OneDimComForce force(g1, g2, w1, w2, k, r0);
+
+    // serialize and then deserialize it
     stringstream buffer;
     XmlSerializer::serialize<OneDimComForce>(&force, "Force", buffer);
     OneDimComForce* copy = XmlSerializer::deserialize<OneDimComForce>(buffer);
-
     // Compare the two forces to see if they are identical.
-
     OneDimComForce& force2 = *copy;
-    ASSERT_EQUAL(force.getNumBonds(), force2.getNumBonds());
-    for (int i = 0; i < force.getNumBonds(); i++) {
-        int a1, a2, b1, b2;
-        double da, db, ka, kb;
-        force.getBondParameters(i, a1, a2, da, ka);
-        force2.getBondParameters(i, b1, b2, db, kb);
-        ASSERT_EQUAL(a1, b1);
-        ASSERT_EQUAL(a2, b2);
-        ASSERT_EQUAL(da, db);
-        ASSERT_EQUAL(ka, kb);
+    ASSERT_EQUAL(force.getForceConst(), force2.getForceConst());
+    ASSERT_EQUAL(force.getR0(), force2.getR0());
+
+    // get all of the groups and weights
+    vector<int> g1_orig = force.getGroup1Indices();
+    vector<int> g2_orig = force.getGroup2Indices();
+    vector<float> w1_orig = force.getGroup1Weights();
+    vector<float> w2_orig = force.getGroup2Weights();
+
+    vector<int> g1_copy = force.getGroup1Indices();
+    vector<int> g2_copy = force.getGroup2Indices();
+    vector<float> w1_copy = force.getGroup1Weights();
+    vector<float> w2_copy = force.getGroup2Weights();
+
+    // make sure the lengths match
+    ASSERT_EQUAL(g1_orig.size(), g1_copy.size());
+    ASSERT_EQUAL(g2_orig.size(), g2_copy.size());
+    ASSERT_EQUAL(w1_orig.size(), w1_copy.size());
+    ASSERT_EQUAL(w2_orig.size(), w2_copy.size());
+
+    // now make sure all of the indices and weights for group1 match
+    for (int i=0; i<g1_orig.size(); ++i) {
+        ASSERT_EQUAL(g1_orig[i], g1_copy[i]);
+        ASSERT_EQUAL(w1_orig[i], w1_orig[i]);
+    }
+
+    // now make sure all of the indices and weights for group1 match
+    for (int i=0; i<g2_orig.size(); ++i) {
+        ASSERT_EQUAL(g2_orig[i], g2_copy[i]);
+        ASSERT_EQUAL(w2_orig[i], w2_orig[i]);
     }
 }
 
